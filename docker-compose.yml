@@ -1,0 +1,128 @@
+version: "3.8"
+
+services:
+  # client:
+  #   container_name: client
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./client
+  #   volumes:
+  #     - ./client:/project-chat/client
+  #     - /project-chat/client/node_modules/
+  #   depends_on:
+  #     - backend
+  #   ports:
+  #     - 3000:3000
+  #   links:
+  #     - backend
+  #   networks:
+  #     - main-network
+  #   restart: unless-stopped
+  backend:
+    container_name: backend
+    build:
+      dockerfile: Dockerfile
+      context: ./backend
+      target: development
+    env_file: ./backend/.env
+    volumes:
+      - ./backend:/project-chat/backend
+      # - /project-chat/backend/node_modules/
+    command: npm run start:debug
+    depends_on:
+      - postgres-main
+      - redis-main
+    ports:
+      - 3001:3001
+    networks:
+      - main-network
+    restart: unless-stopped
+  # queue-worker:
+  #   container_name: queue-worker
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./workers/queues
+  #     target: development
+  #   env_file: ./workers/queues/.env
+  #   volumes:
+  #     - ./workers/queues:/project-chat/workers/queues
+  #     - /project-chat/workers/queues/node_modules/
+  #   command: npm run start:debug
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - main-network
+  #   restart: unless-stopped
+  postgres-main:
+    container_name: postgres-nest
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: postgres-nest
+      PGDATA: /data/postgres
+    volumes:
+      - postgres-volume:/data/postgres
+    ports:
+      - 5432:5432
+    networks:
+      - postgres-network
+      - main-network
+    restart: unless-stopped
+
+  pgadmin-main:
+    container_name: pgadmin-nest
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin-volume:/data/pgadmin
+    ports:
+      - 8080:80
+    depends_on:
+      - postgres-main
+    networks:
+      - postgres-network
+    restart: unless-stopped
+
+  redis-main:
+    container_name: redis-nest
+    image: redis:latest
+    ports:
+      - 6379:6379
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-volume:/data/redis
+    networks:
+      - redis-network
+      - main-network
+    restart: unless-stopped
+
+  redis-commander:
+    container_name: redis-commander-nest
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis-main:6379
+      - HTTP_USER=root
+      - HTTP_PASSWORD=qwerty
+    ports:
+      - 8081:8081
+    depends_on:
+      - redis-main
+    networks:
+      - redis-network
+    restart: unless-stopped
+
+networks:
+  postgres-network:
+    driver: bridge
+  main-network:
+    driver: bridge
+  redis-network:
+    driver: bridge
+
+volumes:
+  postgres-volume:
+  pgadmin-volume:
+  redis-volume:
